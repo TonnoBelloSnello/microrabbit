@@ -1,3 +1,3 @@
-from .RabbitClient import Client
+from .rabbit_client import Client
 
 __all__ = ["Client"]
