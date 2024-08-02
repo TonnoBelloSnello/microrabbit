@@ -32,7 +32,7 @@ client = Client(
 log = logging.getLogger(__file__)
 logging.basicConfig(level=logging.INFO)
 
-@Client.on_message("queue_name")
+@client.on_message("queue_name")
 async def test(data: dict) -> dict:
     log.info(f"Received message {data}")
     return {"connected": True}
