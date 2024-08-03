@@ -40,7 +40,9 @@ async def test(data: dict) -> dict:
 @client.on_ready
 async def on_ready():
     log.info("[*] Waiting for messages. To exit press CTRL+C")
-
+    result = await client.simple_publish("queue_name", {"test": "data"}, timeout=2, decode=True)
+    log.info(result)
+    
 if __name__ == "__main__":
     asyncio.run(client.run())
 ```
@@ -100,6 +102,12 @@ client = Client(
 
 if __name__ == "__main__":
     asyncio.run(client.run())
+```
+
+### Publishing Messages
+Use the `simple_publish` method to publish a message to a queue:
+```python
+result = await client.simple_publish("queue_name", {"test": "data"}, timeout=2, decode=True)
 ```
 
 ## Plugins

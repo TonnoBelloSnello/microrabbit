@@ -6,15 +6,7 @@ from typing import Callable, Awaitable
 
 from aio_pika import IncomingMessage, Exchange
 
-from microrabbit.abc import AbstractClient, _queues, _logger
-
-
-def _is_serializable(obj):
-    try:
-        json.dumps(obj)
-        return True
-    except (TypeError, ValueError):
-        return False
+from microrabbit.abc import AbstractClient, _queues, _logger, _is_serializable
 
 
 class Client(AbstractClient):
@@ -32,12 +24,12 @@ class Client(AbstractClient):
         """
         Run the client, connect to RabbitMQ, declare the queues, and consume messages from them.
         """
-
-        await self.connect()
+        if not self._connection:
+            await self.connect()
 
         tasks = []
         for queue_name, func in _queues.items():
-            queue = await self.declare_queue(queue_name)
+            queue = await self.declare_queue(queue_name, exclusive=True)
             tasks.append(
                 asyncio.create_task(queue.consume(partial(
                     self._handler,
@@ -61,6 +53,8 @@ class Client(AbstractClient):
         :param function: The function to call with the data
         :param message: The incoming message
         """
+        await message.ack()
+
         body = message.body.decode()
         data = ast.literal_eval(body)
 
@@ -78,5 +72,3 @@ class Client(AbstractClient):
                 correlation_id=message.correlation_id,
                 body=returned
             )
-
-        await message.ack()

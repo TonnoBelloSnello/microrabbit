@@ -1,4 +1,4 @@
 from .abc import AbstractClient
-from .app.rabbit_client import Client
+from .app import Client
 
 __all__ = ['AbstractClient', "Client"]
