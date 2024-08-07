@@ -29,6 +29,7 @@ from microrabbit.types import QueueOptions, ConsumerOptions
 
 client = Client(
     host="amqp://guest:guest@localhost/",
+    plugins="./plugins"
 )
 
 
