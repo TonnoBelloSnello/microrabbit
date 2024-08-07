@@ -22,29 +22,42 @@ Here's a simple example of how to use MicroRabbit:
 ```python
 import asyncio
 import logging
+
 from microrabbit import Client
+from microrabbit.types import QueueOptions, ConsumerOptions
+
 
 client = Client(
     host="amqp://guest:guest@localhost/",
-    plugins="./plugins"
 )
+
 
 log = logging.getLogger(__file__)
 logging.basicConfig(level=logging.INFO)
+
 
 @Client.on_message("queue_name")
 async def test(data: dict) -> dict:
     log.info(f"Received message {data}")
     return {"connected": True}
 
+
+@Client.on_message("queue_name2", QueueOptions(exclusive=True), ConsumerOptions(no_ack=True))
+async def test2(data: dict) -> dict:
+    log.info(f"Received message {data}")
+    return {"connected": True}
+
+
 @client.on_ready
 async def on_ready():
     log.info("[*] Waiting for messages. To exit press CTRL+C")
-    result = await client.simple_publish("queue_name", {"test": "data"}, timeout=2, decode=True)
+    result = await client.simple_publish("queue_name2", {"test": "data"}, timeout=2, decode=True)
     log.info(result)
-    
+
+
 if __name__ == "__main__":
     asyncio.run(client.run())
+
 ```
 
 ## Usage
@@ -60,6 +73,7 @@ client = Client(
     host="amqp://guest:guest@localhost/",
     plugins="./plugins"
 )
+
 ```
 
 ### Message Handling
@@ -71,6 +85,7 @@ from microrabbit import Client
 async def handler(data: dict):
     # Process the message
     return response_data # Serializeable data
+
 ```
 
 
@@ -87,6 +102,7 @@ client = Client(
 @client.on_ready
 async def on_ready():
     print("Client is ready")
+
 ```
 
 ### Running the Client
@@ -102,6 +118,7 @@ client = Client(
 
 if __name__ == "__main__":
     asyncio.run(client.run())
+
 ```
 
 ### Publishing Messages
@@ -124,7 +141,34 @@ from microrabbit import Client
 async def test_handler(data: dict):
     print(f"Received message: {data}")
     return {"status": "ok"}
+
 ```
+
+## Advanced Usage
+### Queue Options
+Use the `QueueOptions` class to specify queue options:
+```python
+from microrabbit.types import QueueOptions
+
+@Client.on_message("queue_name", QueueOptions(exclusive=True))
+async def handler(data: dict):
+    # Process the message
+    return response_data
+
+```
+
+### Consumer Options
+Use the `ConsumerOptions` class to specify consumer options:
+```python
+from microrabbit.types import ConsumerOptions
+
+@Client.on_message("queue_name", ConsumerOptions(no_ack=True))
+async def handler(data: dict):
+    # Process the message
+    return response_data
+
+```
+
 
 ## Contributing
 Contributions are welcome! For feature requests, bug reports, or questions, please open an issue. 

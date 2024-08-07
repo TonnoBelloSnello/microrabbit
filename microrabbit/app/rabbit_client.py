@@ -1,6 +1,5 @@
 import ast
 import asyncio
-import json
 from functools import partial
 from typing import Callable, Awaitable
 
@@ -29,15 +28,19 @@ class Client(AbstractClient):
 
         tasks = []
         for queue_name, func in _queues.items():
-            queue = await self.declare_queue(queue_name, exclusive=True)
+            queue = await self.declare_queue(queue_name, func[1])
             tasks.append(
-                asyncio.create_task(queue.consume(partial(
-                    self._handler,
-                    self._exchange,
-                    func
-                )))
+                asyncio.create_task(queue.consume(
+                    partial(
+                        self._handler,
+                        self._exchange,
+                        func[0],
+                        func[2].no_ack
+                    ),
+                    **func[2].to_dict()
+                ))
             )
-            _logger.debug(f"Consuming function {func.__name__} from {queue_name}")
+            _logger.debug(f"Consuming function {func[0].__name__} from {queue_name}")
 
         if self._on_ready_func:
             await self._on_ready_func()
@@ -46,14 +49,15 @@ class Client(AbstractClient):
         await asyncio.gather(*tasks)
 
     async def _handler(self, exchange: Exchange, function: Callable[..., Awaitable],
-                       message: IncomingMessage) -> None:
+                       no_ack: bool, message: IncomingMessage) -> None:
         """
         Handle the incoming message, decode the body, and call the function with the data.
         :param exchange: The exchange to publish the response to
         :param function: The function to call with the data
         :param message: The incoming message
         """
-        await message.ack()
+        if not no_ack:
+            await message.ack()
 
         body = message.body.decode()
         data = ast.literal_eval(body)

@@ -1,17 +1,18 @@
 import asyncio
-import json
-import aio_pika
 import importlib.util
+import json
 import uuid
-
 from pathlib import Path
 from typing import Awaitable, Callable, MutableMapping
-from aio_pika import Channel, Connection, ExchangeType, Exchange, Queue, IncomingMessage
+
+import aio_pika
+from aio_pika import Channel, Connection, Exchange, Queue, IncomingMessage
 
 from .logger import get_logger
+from .types import QueueOptions, ConsumerOptions
 
 _logger = get_logger(__name__)
-_queues: dict[str, Callable[..., Awaitable[None]]] = {}
+_queues: dict[str, tuple[Callable[..., Awaitable[None]], QueueOptions, ConsumerOptions]] = {}
 
 
 class Singleton(type):
@@ -78,14 +79,20 @@ class AbstractClient(metaclass=Singleton):
     async def close(self):
         await self._connection.close()
 
-    async def declare_queue(self, queue_name: str, exclusive: bool = False, **kwargs):
-        return await self._channel.declare_queue(queue_name, exclusive=exclusive, **kwargs)
+    async def declare_queue(self, queue_name: str, options: QueueOptions = QueueOptions()):
+        return await self._channel.declare_queue(queue_name, **options.to_dict())
 
     @staticmethod
-    def on_message(queue_name: str):
+    def on_message(
+            queue_name: str,
+            queue_options: QueueOptions = QueueOptions(),
+            consume_options: ConsumerOptions = ConsumerOptions()
+    ):
         """
         Decorator to add a function to a queue. This function is called when a message is received in the queue.
+        :param consume_options:
         :param queue_name: The name of the queue to add the function to.
+        :param queue_options: The options to use when declaring the queue.
         ```python
         @client.on_message("queue_name")
         async def test(data: dict) -> dict:
@@ -98,7 +105,7 @@ class AbstractClient(metaclass=Singleton):
             if queue_name in _queues:
                 raise ValueError(f"Function {queue_name} already added to function {_queues[queue_name].__name__}")
 
-            _queues[queue_name] = func
+            _queues[queue_name] = (func, queue_options, consume_options)
             _logger.debug(f"Added function {func.__name__} to {queue_name} not yet consumed")
 
         return decorator
@@ -115,7 +122,7 @@ class AbstractClient(metaclass=Singleton):
         """
         self._on_ready_func = func
 
-    async def on_response(self, message: IncomingMessage) -> None:
+    async def _on_response(self, message: IncomingMessage) -> None:
         if message.correlation_id is None:
             _logger.error(f"Bad message {message!r}")
             return
@@ -156,7 +163,7 @@ class AbstractClient(metaclass=Singleton):
         self._futures[correlation_id] = future
         self._callbacks[correlation_id] = await self._channel.declare_queue(exclusive=True)
 
-        await self._callbacks[correlation_id].consume(self.on_response, no_ack=True, exclusive=True, timeout=timeout)
+        await self._callbacks[correlation_id].consume(self._on_response, no_ack=True, exclusive=True, timeout=timeout)
 
         await self._exchange.publish(
             message=aio_pika.Message(
