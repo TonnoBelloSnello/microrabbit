@@ -179,7 +179,7 @@ class AbstractClient(metaclass=Singleton):
             response = await asyncio.wait_for(future, timeout=timeout)
             if decode:
                 return response.decode()
-
+            return response
         except asyncio.TimeoutError:
             raise TimeoutError("The request timed out")
 
