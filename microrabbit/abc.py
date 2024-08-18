@@ -101,12 +101,14 @@ class AbstractClient(metaclass=Singleton):
         ```
         """
 
-        def decorator(func: Callable[..., Awaitable]):
+        def decorator(func: Callable[..., Awaitable]) -> Callable[..., Awaitable]:
             if queue_name in _queues:
                 raise ValueError(f"Function {queue_name} already added to function {_queues[queue_name].__name__}")
 
             _queues[queue_name] = (func, queue_options, consume_options)
             _logger.debug(f"Added function {func.__name__} to {queue_name} not yet consumed")
+
+            return func
 
         return decorator
 
