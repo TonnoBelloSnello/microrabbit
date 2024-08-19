@@ -3,7 +3,7 @@ import importlib.util
 import json
 import uuid
 from pathlib import Path
-from typing import Awaitable, Callable, MutableMapping
+from typing import Awaitable, Callable, MutableMapping, Any
 
 import aio_pika
 from aio_pika import Channel, Connection, Exchange, Queue, IncomingMessage
@@ -132,7 +132,7 @@ class AbstractClient(metaclass=Singleton):
         future: asyncio.Future = self._futures.pop(message.correlation_id)
         future.set_result(message.body)
 
-    async def simple_publish(self, routing_key: str, body: any, correlation_id=None, timeout: int = 10, decode=True):
+    async def simple_publish(self, routing_key: str, body: Any, correlation_id=None, timeout: int = 10, decode=True):
         """
         Publish a message to the default exchange with a routing key and correlation id.
         :param routing_key: the routing key to use
