@@ -2,6 +2,7 @@ import asyncio
 import importlib.util
 import json
 import uuid
+from functools import partial
 from pathlib import Path
 from typing import Awaitable, Callable, MutableMapping, Any
 
@@ -79,16 +80,6 @@ class AbstractClient(metaclass=Singleton):
     async def close(self):
         await self._connection.close()
 
-    async def is_connected(self) -> bool:
-        """
-        Check if the client is connected to RabbitMQ.
-        """
-        
-        return self._connection is not None and not self._connection.is_closed
-
-    async def declare_queue(self, queue_name: str, options: QueueOptions = QueueOptions()):
-        return await self._channel.declare_queue(queue_name, **options.to_dict())
-
     async def __aenter__(self):
         await self.connect()
         return self
@@ -96,6 +87,44 @@ class AbstractClient(metaclass=Singleton):
     async def __aexit__(self, *exc):
         await self.close()
         return False
+
+    async def is_connected(self) -> bool:
+        """
+        Check if the client is connected to RabbitMQ.
+        """
+        if self._connection is None or self._connection.is_closed:
+            return False
+
+        async def message_handler(exchange: Exchange, message: IncomingMessage):
+            await self.publish(
+                exchange=exchange,
+                routing_key=message.reply_to,
+                correlation_id=message.correlation_id,
+                body=True
+            )
+
+        uid = str(uuid.uuid4())
+        new_queue = await self.declare_queue(options=QueueOptions(exclusive=True, auto_delete=True))
+        task = asyncio.create_task(
+            new_queue.consume(
+                partial(message_handler, self._exchange),
+                no_ack=True,
+                exclusive=True,
+                timeout=1
+            )
+        )
+
+        try:
+            resp = await self.simple_publish(new_queue.name, {}, correlation_id=uid)
+            return resp
+        except Exception:
+            return False
+        finally:
+            task.cancel()
+            await self._channel.queue_delete(new_queue.name)
+
+    async def declare_queue(self, queue_name: str = None, options: QueueOptions = QueueOptions()):
+        return await self._channel.declare_queue(name=queue_name, **options.to_dict())
 
     @staticmethod
     def on_message(
@@ -179,7 +208,7 @@ class AbstractClient(metaclass=Singleton):
         future = loop.create_future()
 
         self._futures[correlation_id] = future
-        self._callbacks[correlation_id] = await self._channel.declare_queue(exclusive=True)
+        self._callbacks[correlation_id] = await self._channel.declare_queue(exclusive=True, auto_delete=True)
 
         await self._callbacks[correlation_id].consume(self._on_response, no_ack=True, exclusive=True, timeout=timeout)
 
@@ -195,6 +224,8 @@ class AbstractClient(metaclass=Singleton):
 
         try:
             response = await asyncio.wait_for(future, timeout=timeout)
+
+            await self._channel.queue_delete(self._callbacks[correlation_id].name)
             if decode:
                 return response.decode()
             return response
