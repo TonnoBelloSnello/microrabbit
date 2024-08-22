@@ -80,6 +80,10 @@ class AbstractClient(metaclass=Singleton):
         await self._connection.close()
 
     async def is_connected(self) -> bool:
+        """
+        Check if the client is connected to RabbitMQ.
+        """
+        
         return self._connection is not None and not self._connection.is_closed
 
     async def declare_queue(self, queue_name: str, options: QueueOptions = QueueOptions()):
