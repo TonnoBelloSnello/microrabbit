@@ -80,19 +80,7 @@ class AbstractClient(metaclass=Singleton):
         await self._connection.close()
 
     async def is_connected(self) -> bool:
-        if self._connection is None or self._connection.is_closed:
-            return False
-
-        queue_name = str(uuid.uuid4())
-        queue = await self.declare_queue(queue_name)
-        try:
-            _ = await self.simple_publish(queue_name, {}, timeout=2)
-        except asyncio.TimeoutError:
-            return False
-        else:
-            return True
-        finally:
-            await queue.delete()
+        return self._connection is not None and not self._connection.is_closed
 
     async def declare_queue(self, queue_name: str, options: QueueOptions = QueueOptions()):
         return await self._channel.declare_queue(queue_name, **options.to_dict())
