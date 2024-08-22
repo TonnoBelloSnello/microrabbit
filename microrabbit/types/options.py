@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Union
@@ -17,14 +17,7 @@ class QueueOptions:
     passive: bool = False
 
     def to_dict(self) -> dict:
-        return {
-            "durable": self.durable,
-            "auto_delete": self.auto_delete,
-            "exclusive": self.exclusive,
-            "arguments": self.arguments,
-            "timeout": self.timeout,
-            "passive": self.passive
-        }
+        return asdict(self)
 
 
 @dataclass
@@ -39,10 +32,4 @@ class ConsumerOptions:
     timeout: Union[int, float, None] = None
 
     def to_dict(self) -> dict:
-        return {
-            "no_ack": self.no_ack,
-            "exclusive": self.exclusive,
-            "arguments": self.arguments,
-            "consumer_tag": self.consumer_tag,
-            "timeout": self.timeout
-        }
+        return asdict(self)
