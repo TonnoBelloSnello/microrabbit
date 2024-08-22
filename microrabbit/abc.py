@@ -79,8 +79,31 @@ class AbstractClient(metaclass=Singleton):
     async def close(self):
         await self._connection.close()
 
+    async def is_connected(self) -> bool:
+        if self._connection is None or self._connection.is_closed:
+            return False
+
+        queue_name = str(uuid.uuid4())
+        queue = await self.declare_queue(queue_name)
+        try:
+            _ = await self.simple_publish(queue_name, {}, timeout=2)
+        except asyncio.TimeoutError:
+            return False
+        else:
+            return True
+        finally:
+            await queue.delete()
+
     async def declare_queue(self, queue_name: str, options: QueueOptions = QueueOptions()):
         return await self._channel.declare_queue(queue_name, **options.to_dict())
+
+    async def __aenter__(self):
+        await self.connect()
+        return self
+
+    async def __aexit__(self, *exc):
+        await self.close()
+        return False
 
     @staticmethod
     def on_message(
@@ -123,6 +146,7 @@ class AbstractClient(metaclass=Singleton):
         ```
         """
         self._on_ready_func = func
+        return func
 
     async def _on_response(self, message: IncomingMessage) -> None:
         if message.correlation_id is None:
