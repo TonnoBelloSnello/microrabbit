@@ -13,7 +13,7 @@ from .logger import get_logger
 from .types import QueueOptions, ConsumerOptions
 
 _logger = get_logger(__name__)
-_queues: Dict[str, Tuple[Callable[..., Awaitable[None]], QueueOptions, ConsumerOptions]] = {}
+_queues: Dict[str, Tuple[Callable[..., Awaitable[Any]], QueueOptions, ConsumerOptions]] = {}
 
 
 class Singleton(type):
@@ -116,9 +116,10 @@ class AbstractClient(metaclass=Singleton):
 
         try:
             resp = await self.simple_publish(new_queue.name, {}, correlation_id=uid)
-            return resp
+            return bool(resp)
         except Exception:
             return False
+
         finally:
             task.cancel()
             await self._channel.queue_delete(new_queue.name)
@@ -147,7 +148,7 @@ class AbstractClient(metaclass=Singleton):
 
         def decorator(func: Callable[..., Awaitable]) -> Callable[..., Awaitable]:
             if queue_name in _queues:
-                raise ValueError(f"Function {queue_name} already added to function {_queues[queue_name].__name__}")
+                raise ValueError(f"Function {queue_name} already added to function {_queues[queue_name][0].__name__}")
 
             _queues[queue_name] = (func, queue_options, consume_options)
             _logger.debug(f"Added function {func.__name__} to {queue_name} not yet consumed")
