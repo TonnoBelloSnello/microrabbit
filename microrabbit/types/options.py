@@ -1,7 +1,7 @@
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Union
+from typing import Union, Dict, List
 
 
 @dataclass
@@ -12,7 +12,7 @@ class QueueOptions:
     durable: bool = False
     auto_delete: bool = False
     exclusive: bool = False
-    arguments: dict[str, Union[bool, bytes, bytearray, Decimal, list, float, int, None, str, datetime]] = None
+    arguments: Dict[str, Union[bool, bytes, bytearray, Decimal, List, float, int, None, str, datetime]] = None
     timeout: Union[int, float, None] = None
     passive: bool = False
 
@@ -27,7 +27,7 @@ class ConsumerOptions:
     """
     no_ack: bool = False
     exclusive: bool = False
-    arguments: dict[str, Union[bool, bytes, bytearray, Decimal, list, float, int, None, str, datetime]] = None
+    arguments: Dict[str, Union[bool, bytes, bytearray, Decimal, List, float, int, None, str, datetime]] = None
     consumer_tag: str = None
     timeout: Union[int, float, None] = None
 
