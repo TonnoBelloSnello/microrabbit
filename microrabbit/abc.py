@@ -4,7 +4,7 @@ import json
 import uuid
 from functools import partial
 from pathlib import Path
-from typing import Awaitable, Callable, MutableMapping, Any
+from typing import Awaitable, Callable, MutableMapping, Any, Dict, Tuple
 
 import aio_pika
 from aio_pika import Channel, Connection, Exchange, Queue, IncomingMessage
@@ -13,7 +13,7 @@ from .logger import get_logger
 from .types import QueueOptions, ConsumerOptions
 
 _logger = get_logger(__name__)
-_queues: dict[str, tuple[Callable[..., Awaitable[None]], QueueOptions, ConsumerOptions]] = {}
+_queues: Dict[str, Tuple[Callable[..., Awaitable[None]], QueueOptions, ConsumerOptions]] = {}
 
 
 class Singleton(type):
@@ -233,7 +233,7 @@ class AbstractClient(metaclass=Singleton):
             raise TimeoutError("The request timed out")
 
     @staticmethod
-    async def publish(exchange: Exchange, routing_key: str, correlation_id, body: dict):
+    async def publish(exchange: Exchange, routing_key: str, correlation_id, body: Dict):
         """
         Publish a message to an exchange with a routing key and correlation id.
         :param exchange: the exchange to publish the message to
