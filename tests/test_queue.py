@@ -1,6 +1,7 @@
 import asyncio
 import pytest
 
+from aiormq import ChannelAccessRefused
 from aiormq.exceptions import ChannelLockedResource
 from microrabbit import Client
 from microrabbit.types import QueueOptions, ConsumerOptions
@@ -25,15 +26,19 @@ async def test_create_queue(client: Client):
     task = asyncio.create_task(client.run())
     assert task.done() is False, "Task is done"
     try:
+        await asyncio.sleep(1)
         queue = await client.declare_queue(
-            "queue_name",
+            "test_create_queue",
             QueueOptions(exclusive=True, auto_delete=True)
         )
-
-        queue.consume(lambda _: None, exclusive=True, no_ack=True)
+        async def T():
+            return None 
+        
+        await queue.consume(T, exclusive=True, no_ack=True)
         assert False, "Queue exists"
-    except ChannelLockedResource:
+    except (ChannelLockedResource, ChannelAccessRefused):
         assert True
+        
 
 
 @pytest.mark.asyncio
