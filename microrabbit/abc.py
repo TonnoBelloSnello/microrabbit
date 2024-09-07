@@ -226,12 +226,14 @@ class AbstractClient(metaclass=Singleton):
         try:
             response = await asyncio.wait_for(future, timeout=timeout)
 
-            await self._channel.queue_delete(self._callbacks[correlation_id].name)
             if decode:
                 return response.decode()
             return response
-        except asyncio.TimeoutError:
-            raise TimeoutError("The request timed out")
+        except asyncio.TimeoutError as e:
+            raise TimeoutError("The request timed out") from e
+        finally:
+            await self._channel.queue_delete(self._callbacks[correlation_id].name)   
+            del self._callbacks[correlation_id]
 
     @staticmethod
     async def publish(exchange: Exchange, routing_key: str, correlation_id, body: Dict):
