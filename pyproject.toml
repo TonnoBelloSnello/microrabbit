@@ -1,0 +1,12 @@
+[project]
+name = "microrabbit"
+version = "0.3.3"
+description = "A simple RabbitMQ client for Python"
+readme = "README.md"
+license = {file = "LICENSE.txt"}
+authors = [{name = "TonnoBelloSnello"}]
+maintainers = [{name = "TonnoBelloSnello"}, {name = "TelegramXPlus"}]
+requires-python = ">=3.8"
+dependencies = [
+    "aio-pika==9.4.2"
+]
