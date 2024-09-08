@@ -60,7 +60,10 @@ class Client(AbstractClient):
             await message.ack()
 
         body = message.body.decode()
-        data = ast.literal_eval(body)
+        try:
+            data = ast.literal_eval(body)
+        except (SyntaxError, ValueError):
+            data = body
 
         _logger.debug(f"Received message {data} from {message.routing_key}")
 
