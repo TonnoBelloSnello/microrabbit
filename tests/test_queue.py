@@ -9,7 +9,9 @@ from microrabbit.types import QueueOptions, ConsumerOptions
 
 @pytest.mark.asyncio
 async def test_connection(client: Client):
-    assert await client.is_connected() is True, "Connection failed"
+    is_connected = await client.is_connected()
+    await client.close()
+    assert is_connected is True, "Connection failed"
 
 
 @pytest.mark.asyncio
@@ -38,6 +40,8 @@ async def test_create_queue(client: Client):
         assert False, "Queue exists"
     except (ChannelLockedResource, ChannelAccessRefused):
         assert True
+    finally:
+        await client.close()
         
 
 
@@ -59,6 +63,8 @@ async def test_publish(client: Client):
         assert resp == "{'connected': True}", "Publish failed"
     except asyncio.TimeoutError:
         assert False, "Timeout"
+    finally:
+        await client.close()
 
 
 @pytest.mark.asyncio
@@ -74,4 +80,5 @@ async def test_on_ready(client: Client):
     task = asyncio.create_task(client.run())
     assert task.done() is False, "Task is done"
     await asyncio.sleep(1)
+    await client.close()
     assert dummy is True, "On ready failed"
