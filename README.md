@@ -1,5 +1,4 @@
 # MicroRabbit
-
 MicroRabbit is a lightweight, asynchronous Python framework for working with RabbitMQ. It simplifies the process of
 setting up RabbitMQ consumers and publishers, making it easy to build microservices and distributed systems.
 
@@ -14,7 +13,7 @@ setting up RabbitMQ consumers and publishers, making it easy to build microservi
 ## Installation
 
 ```bash
-pip install git+https://@github.com/TonnoBelloSnello/microrabbit.git
+pip install microrabbit
 ```
 
 ## Quick Start

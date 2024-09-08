@@ -8,10 +8,7 @@ from typing import AsyncIterator
 @fixture(scope="function")
 async def client() -> AsyncIterator[Client]:
     async with Client(host="amqp://guest:guest@localhost/") as c:
-        await asyncio.sleep(1)
         yield c
-        
-    await asyncio.sleep(1)
 
 def pytest_collection_modifyitems(items):
     pytest_asyncio_tests = (item for item in items if is_async_test(item))
