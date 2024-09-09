@@ -1,4 +1,8 @@
 # MicroRabbit
+
+[![Python 3.8 test](https://github.com/TonnoBelloSnello/microrabbit/actions/workflows/test-3_8.yml/badge.svg)](https://github.com/TonnoBelloSnello/microrabbit/actions/workflows/test-3_8.yml) 
+[![Downloads](https://static.pepy.tech/badge/microrabbit)](https://pepy.tech/project/microrabbit)
+
 MicroRabbit is a lightweight, asynchronous Python framework for working with RabbitMQ. It simplifies the process of
 setting up RabbitMQ consumers and publishers, making it easy to build microservices and distributed systems.
 
