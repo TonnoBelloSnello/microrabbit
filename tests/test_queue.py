@@ -1,8 +1,9 @@
 import asyncio
-import pytest
 
+import pytest
 from aiormq import ChannelAccessRefused
 from aiormq.exceptions import ChannelLockedResource
+
 from microrabbit import Client
 from microrabbit.types import QueueOptions, ConsumerOptions
 

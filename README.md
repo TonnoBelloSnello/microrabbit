@@ -29,11 +29,13 @@ import asyncio
 import logging
 
 from microrabbit import Client
-from microrabbit.types import QueueOptions, ConsumerOptions
+from microrabbit.types import QueueOptions, ConsumerOptions, ConnectionOptions
 
 client = Client(
     host="amqp://guest:guest@localhost/",
-    plugins="./plugins"
+    plugins="./plugins",
+    connection_type="ROBUST",
+    connection_options=ConnectionOptions()
 )
 
 log = logging.getLogger(__file__)
@@ -72,13 +74,18 @@ Create a `Client` instance with the following parameters:
 
 - `host`: RabbitMQ server URL
 - `plugins`: Path to the plugins folder (optional)
+- `connection_type`: Connection type `str (NORMAL, ROBUST)` or `CONNECTION_TYPE`(optional)
+- `connection_options`: Connection options `ConnectionOptions` (optional)
 
 ```python
 from microrabbit import Client
+from microrabbit.types import CONNECTION_TYPE, ConnectionOptions
 
 client = Client(
     host="amqp://guest:guest@localhost/",
-    plugins="./plugins"
+    plugins="./plugins",
+    connection_type=CONNECTION_TYPE.NORMAL,
+    connection_options=ConnectionOptions(ssl=True)
 )
 
 ```

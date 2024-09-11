@@ -1,8 +1,9 @@
-import pytest
-import asyncio
-from microrabbit import Client
-from pytest_asyncio import fixture, is_async_test
 from typing import AsyncIterator
+
+import pytest
+from pytest_asyncio import fixture, is_async_test
+
+from microrabbit import Client
 
 
 @fixture(scope="function")

@@ -1,52 +1,30 @@
 import asyncio
-import importlib.util
-import json
 import uuid
+from abc import ABC, abstractmethod
 from functools import partial
 from pathlib import Path
-from typing import Awaitable, Callable, MutableMapping, Any, Dict, Tuple
+from typing import Awaitable, Callable, MutableMapping, Any, Dict, Tuple, Union
 
 import aio_pika
-from aio_pika import Channel, Connection, Exchange, Queue, IncomingMessage
+from aio_pika import Channel, Connection, Exchange, Queue, IncomingMessage, RobustConnection
 
+from .app.utils import PluginLoader, is_serializable
 from .logger import get_logger
-from .types import QueueOptions, ConsumerOptions
+from .types import QueueOptions, ConsumerOptions, ConnectionOptions
+from .types.enums import CONNECTION_TYPE
 
 _logger = get_logger(__name__)
 _queues: Dict[str, Tuple[Callable[..., Awaitable[Any]], QueueOptions, ConsumerOptions]] = {}
 
 
-class Singleton(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
-
-
-class PluginLoader:
-    def __init__(self, plugins_dir: Path):
-        self.plugins_dir = plugins_dir
-
-    def load_plugins(self):
-        for file in self.plugins_dir.iterdir():
-            if file.suffix == ".py":
-                spec = importlib.util.spec_from_file_location(file.stem, file)
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
-
-
-def _is_serializable(obj):
-    try:
-        json.dumps(obj)
-        return True
-    except (TypeError, ValueError):
-        return False
-
-
-class AbstractClient(metaclass=Singleton):
-    def __init__(self, host: str, plugins: str = None):
+class AbstractClient(ABC):
+    def __init__(
+            self,
+            host: str,
+            plugins: str = None,
+            connection_type: CONNECTION_TYPE = CONNECTION_TYPE.NORMAL,
+            connection_options: ConnectionOptions = ConnectionOptions()
+    ):
         """
         Constructor for the AbstractClient class singleton, which is used to interact with RabbitMQ, declare queues, and
         consume messages from them.
@@ -55,9 +33,11 @@ class AbstractClient(metaclass=Singleton):
         """
         self.host = host
         self.plugins = plugins
+        self.connection_type = connection_type
+        self.connection_options = connection_options
         self._exchange = None
         self._channel: Channel = None
-        self._connection: Connection = None
+        self._connection: Union[Connection, RobustConnection] = None
         self._on_ready_func: Callable[..., Awaitable] = None
         self._futures: MutableMapping[str, asyncio.Future] = {}
         self._callbacks: MutableMapping[str, Queue] = {}
@@ -71,22 +51,32 @@ class AbstractClient(metaclass=Singleton):
             plugin_loader = PluginLoader(Path(plugins))
             plugin_loader.load_plugins()
 
+    @abstractmethod
     async def connect(self):
-        self._connection = await aio_pika.connect(self.host)
-        self._channel = await self._connection.channel()
-        self._exchange = self._channel.default_exchange
-        return self._connection, self._channel
+        raise NotImplementedError
 
+    @abstractmethod
     async def close(self):
-        await self._connection.close()
+        raise NotImplementedError
 
+    @abstractmethod
     async def __aenter__(self):
-        await self.connect()
-        return self
+        raise NotImplementedError
 
+    @abstractmethod
     async def __aexit__(self, *exc):
-        await self.close()
-        return False
+        raise NotImplementedError
+
+    async def _connect(self) -> Union[Connection, RobustConnection]:
+        """
+        Connect to RabbitMQ.
+        """
+        action = {
+            CONNECTION_TYPE.NORMAL: aio_pika.connect,
+            CONNECTION_TYPE.ROBUST: aio_pika.connect_robust
+        }
+
+        return await action[self.connection_type](url=self.host, **self.connection_options.to_dict())
 
     async def is_connected(self) -> bool:
         """
@@ -195,7 +185,7 @@ class AbstractClient(metaclass=Singleton):
         if correlation_id is None:
             correlation_id = str(uuid.uuid4())
 
-        if not _is_serializable(body):
+        if not is_serializable(body):
             raise ValueError("Body must be a serializable object")
 
         if routing_key is None:
@@ -232,7 +222,7 @@ class AbstractClient(metaclass=Singleton):
         except asyncio.TimeoutError as e:
             raise TimeoutError("The request timed out") from e
         finally:
-            await self._channel.queue_delete(self._callbacks[correlation_id].name)   
+            await self._channel.queue_delete(self._callbacks[correlation_id].name)
             del self._callbacks[correlation_id]
 
     @staticmethod

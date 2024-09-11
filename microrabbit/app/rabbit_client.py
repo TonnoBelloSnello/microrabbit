@@ -1,23 +1,55 @@
 import ast
 import asyncio
 from functools import partial
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, Union, Literal
 
 from aio_pika import IncomingMessage, Exchange
 
-from microrabbit.abc import AbstractClient, _queues, _logger, _is_serializable
+from microrabbit.abc import AbstractClient, _queues, _logger
+from microrabbit.types import ConnectionOptions
+from microrabbit.types.enums import CONNECTION_TYPE
+from .utils import AbstractSingleton, is_serializable
 
 
-class Client(AbstractClient):
-    def __init__(self, host: str, plugins: str = None):
+class Client(AbstractClient, metaclass=AbstractSingleton):
+    def __init__(
+            self,
+            host: str,
+            plugins: str = None,
+            connection_type: Union[CONNECTION_TYPE, Literal["NORMAL", "ROBUST"]] = CONNECTION_TYPE.NORMAL,
+            connection_options: ConnectionOptions = ConnectionOptions()
+    ):
         """
         Constructor for the AbstractClient class singleton, which is used to interact with RabbitMQ, declare queues, and
         consume messages from them.
         :param host:  The RabbitMQ host to connect to
         :param plugins: The directory where the plugins are stored. This is used to dynamically import the plugins.
+        :param connection_type: The type of connection to use.
+        :param connection_options: The connection options to use.
         """
+        try:
+            connection_type = CONNECTION_TYPE(connection_type)
+        except ValueError:
+            raise ValueError(f"Invalid connection type {connection_type}")
 
-        super().__init__(host, plugins)
+        super().__init__(host, plugins, connection_type, connection_options)
+
+    async def connect(self):
+        self._connection = await self._connect()
+        self._channel = await self._connection.channel()
+        self._exchange = self._channel.default_exchange
+        return self._connection, self._channel
+    
+    async def close(self):
+        await self._connection.close()
+
+    async def __aenter__(self):
+        await self.connect()
+        return self
+
+    async def __aexit__(self, *exc):
+        await self.close()
+        return False
 
     async def run(self) -> None:
         """
@@ -69,7 +101,7 @@ class Client(AbstractClient):
 
         returned = await function(data)
 
-        if not _is_serializable(returned):
+        if not is_serializable(returned):
             raise ValueError("Function must return a serializable object")
 
         if returned:
