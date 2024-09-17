@@ -14,13 +14,14 @@ from .types import QueueOptions, ConsumerOptions, ConnectionOptions
 from .types.enums import CONNECTION_TYPE
 
 _logger = get_logger(__name__)
-_queues: Dict[str, Tuple[Callable[..., Awaitable[Any]], QueueOptions, ConsumerOptions]] = {}
+_queues: Dict[str, Dict[str, Tuple[Callable[..., Awaitable[Any]], QueueOptions, ConsumerOptions]]] = {"global": {}}
 
 
 class AbstractClient(ABC):
     def __init__(
             self,
             host: str,
+            instance_id: str = None,
             plugins: str = None,
             connection_type: CONNECTION_TYPE = CONNECTION_TYPE.NORMAL,
             connection_options: ConnectionOptions = ConnectionOptions()
@@ -35,6 +36,8 @@ class AbstractClient(ABC):
         self.plugins = plugins
         self.connection_type = connection_type
         self.connection_options = connection_options
+        self.instance_id = str(uuid.uuid4()) if not instance_id else instance_id
+
         self._exchange = None
         self._channel: Channel = None
         self._connection: Union[Connection, RobustConnection] = None
@@ -120,14 +123,16 @@ class AbstractClient(ABC):
     @staticmethod
     def on_message(
             queue_name: str,
+            instance_id: str = None,
             queue_options: QueueOptions = QueueOptions(),
-            consume_options: ConsumerOptions = ConsumerOptions()
+            consume_options: ConsumerOptions = ConsumerOptions(),
     ):
         """
         Decorator to add a function to a queue. This function is called when a message is received in the queue.
-        :param consume_options:
         :param queue_name: The name of the queue to add the function to.
+        :param instance_id: The instance id of the client if not provided then the function is added to the global
         :param queue_options: The options to use when declaring the queue.
+        :param consume_options: The options to use when consuming the queue.
         ```python
         @client.on_message("queue_name")
         async def test(data: dict) -> dict:
@@ -136,12 +141,21 @@ class AbstractClient(ABC):
         ```
         """
 
-        def decorator(func: Callable[..., Awaitable]) -> Callable[..., Awaitable]:
-            if queue_name in _queues:
-                raise ValueError(f"Function {queue_name} already added to function {_queues[queue_name][0].__name__}")
+        def decorator(func: Callable[..., Awaitable[Any]]) :
+            if queue_name in _queues["global"]:
+                raise ValueError(f"Function {queue_name} already added to function {_queues['global'][queue_name][0].__name__}")
+            if queue_name in _queues.get(instance_id, {}):
+                raise ValueError(f"Function {queue_name} already added to function {_queues[instance_id][queue_name][0].__name__}")
 
-            _queues[queue_name] = (func, queue_options, consume_options)
-            _logger.debug(f"Added function {func.__name__} to {queue_name} not yet consumed")
+            if not instance_id:
+                _queues["global"][queue_name] = (func, queue_options, consume_options)
+                _logger.debug(f"Added function {func.__name__} to {queue_name} not yet consumed")
+            else:
+                if instance_id not in _queues:
+                    _queues[instance_id] = {}
+
+                _queues[instance_id][queue_name] = (func, queue_options, consume_options)
+                _logger.debug(f"Added function {func.__name__} to {queue_name} not yet consumed")
 
             return func
 

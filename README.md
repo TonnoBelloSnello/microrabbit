@@ -48,7 +48,7 @@ async def test(data: dict) -> dict:
     return {"connected": True}
 
 
-@Client.on_message("queue_name2", QueueOptions(exclusive=True), ConsumerOptions(no_ack=True))
+@Client.on_message("queue_name2", queue_options=QueueOptions(exclusive=True), consume_options=ConsumerOptions(no_ack=True))
 async def test2(data: dict) -> dict:
     log.info(f"Received message {data}")
     return {"connected": True}
@@ -73,6 +73,7 @@ if __name__ == "__main__":
 Create a `Client` instance with the following parameters:
 
 - `host`: RabbitMQ server URL
+- `instance_id`: Unique identifier for the client if not provided it will be generated automatically (optional)
 - `plugins`: Path to the plugins folder (optional)
 - `connection_type`: Connection type `str (NORMAL, ROBUST)` or `CONNECTION_TYPE`(optional)
 - `connection_options`: Connection options `ConnectionOptions` (optional)
@@ -83,6 +84,7 @@ from microrabbit.types import CONNECTION_TYPE, ConnectionOptions
 
 client = Client(
     host="amqp://guest:guest@localhost/",
+    instance_id="unique_id",
     plugins="./plugins",
     connection_type=CONNECTION_TYPE.NORMAL,
     connection_options=ConnectionOptions(ssl=True)
@@ -93,12 +95,17 @@ client = Client(
 ### Message Handling
 
 Use the `@Client.on_message` decorator to define a message handler. The decorator takes the queue name as an argument.
-
+Arguments:
+- `queue_name`: Name of the queue
+- `instance_id`: Unique identifier for the client if not provided it will be setted as global, 
+when a client runs the queue will be consumed (optional)
+- `queue_options`: Queue options `QueueOptions` (optional)
+- `consume_options`: Consumer options `ConsumerOptions` (optional)
 ```python
 from microrabbit import Client
+from microrabbit.types import QueueOptions
 
-
-@Client.on_message("queue_name")
+@Client.on_message("queue_name", queue_options=QueueOptions(exclusive=True))
 async def handler(data: dict):
     # Process the message
     return response_data  # Serializeable data
@@ -200,7 +207,7 @@ Use the `QueueOptions` class to specify queue options:
 from microrabbit.types import QueueOptions
 
 
-@Client.on_message("queue_name", QueueOptions(exclusive=True))
+@Client.on_message("queue_name", queue_options=QueueOptions(exclusive=True))
 async def handler(data: dict):
     # Process the message
     return response_data
@@ -215,7 +222,7 @@ Use the `ConsumerOptions` class to specify consumer options:
 from microrabbit.types import ConsumerOptions
 
 
-@Client.on_message("queue_name", ConsumerOptions(no_ack=True))
+@Client.on_message("queue_name", consume_options=ConsumerOptions(no_ack=True))
 async def handler(data: dict):
     # Process the message
     return response_data
