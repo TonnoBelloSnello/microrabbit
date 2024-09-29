@@ -27,7 +27,7 @@ class AbstractClient(ABC):
             connection_options: ConnectionOptions = ConnectionOptions()
     ):
         """
-        Constructor for the AbstractClient class singleton, which is used to interact with RabbitMQ, declare queues, and
+        Constructor for the AbstractClient class, which is used to interact with RabbitMQ, declare queues, and
         consume messages from them.
         :param host:  The RabbitMQ host to connect to
         :param plugins: The directory where the plugins are stored. This is used to dynamically import the plugins.
@@ -78,7 +78,6 @@ class AbstractClient(ABC):
             CONNECTION_TYPE.NORMAL: aio_pika.connect,
             CONNECTION_TYPE.ROBUST: aio_pika.connect_robust
         }
-
         return await action[self.connection_type](url=self.host, **self.connection_options.to_dict())
 
     async def is_connected(self) -> bool:
@@ -161,7 +160,7 @@ class AbstractClient(ABC):
 
         return decorator
 
-    def on_ready(self, func: Callable[..., Awaitable[None]]):
+    def on_ready(self, func: Callable[[], Awaitable[None]]):
         """
         Decorator to set the on_ready function. This function is called when the client is ready to consume messages.
         :param func: The function to call when the client is ready to consume messages.
@@ -182,7 +181,7 @@ class AbstractClient(ABC):
         future: asyncio.Future = self._futures.pop(message.correlation_id)
         future.set_result(message.body)
 
-    async def simple_publish(self, routing_key: str, body: Any, correlation_id=None, timeout: int = 10, decode=True):
+    async def simple_publish(self, routing_key: str, body: Any, correlation_id=None, timeout: int = 10, decode=True) -> Union[bytes, str]:
         """
         Publish a message to the default exchange with a routing key and correlation id.
         :param routing_key: the routing key to use

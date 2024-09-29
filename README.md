@@ -13,6 +13,7 @@ setting up RabbitMQ consumers and publishers, making it easy to build microservi
 - Plugin system for modular code organization
 - Easy-to-use client configuration
 - Built-in logging support
+- Customizable type annotations for message data
 
 ## Installation
 
@@ -28,8 +29,12 @@ Here's a simple example of how to use MicroRabbit:
 import asyncio
 import logging
 
+from pydantic import BaseModel
 from microrabbit import Client
 from microrabbit.types import QueueOptions, ConsumerOptions, ConnectionOptions
+
+class Message(BaseModel):
+    test: str
 
 client = Client(
     host="amqp://guest:guest@localhost/",
@@ -49,8 +54,8 @@ async def test(data: dict) -> dict:
 
 
 @Client.on_message("queue_name2", queue_options=QueueOptions(exclusive=True), consume_options=ConsumerOptions(no_ack=True))
-async def test2(data: dict) -> dict:
-    log.info(f"Received message {data}")
+async def test2(data: int|Message) -> dict:
+    log.info(f"Received message {data.test}")
     return {"connected": True}
 
 
@@ -111,6 +116,27 @@ async def handler(data: dict):
     return response_data  # Serializeable data
 
 ```
+
+### Message Data Types
+In the handler function, you can specify the data type of the message using type annotations:
+
+```python
+from microrabbit import Client
+
+from typing import Union    
+from pydantic import BaseModel
+
+class Message(BaseModel):
+    test: str
+    
+@Client.on_message("queue_name")
+async def handler(data: Union[Message, int]):
+    # if the message is not a valid Message object or an int, an error will be raised
+    print(data.test) 
+    return response_data
+
+```
+
 
 ### Ready Event
 

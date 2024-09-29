@@ -8,7 +8,7 @@ from microrabbit import Client
 
 @fixture(scope="function")
 async def client() -> AsyncIterator[Client]:
-    async with Client(host="amqp://guest:guest@localhost/") as c:
+    async with Client(host="amqp://guest:guest@localhost/", connection_type="ROBUST") as c:
         yield c
 
 def pytest_collection_modifyitems(items):
