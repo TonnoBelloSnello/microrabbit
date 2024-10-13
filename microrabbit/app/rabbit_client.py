@@ -9,7 +9,7 @@ if sys.version_info >= (3, 10):
     from types import UnionType
 
 from aio_pika import IncomingMessage, Exchange
-from pydantic import ValidationError
+from pydantic import ValidationError, BaseModel
 
 from microrabbit.abc import AbstractClient, _queues, _logger
 from microrabbit.types import ConnectionOptions
@@ -169,8 +169,20 @@ class Client(AbstractClient):
 
         returned = await function(data)
 
+        if function.__annotations__.get("return") is not None:
+            return_type = function.__annotations__["return"]
+            if hasattr(return_type, '__args__'):
+                return_type = return_type.__args__
+            
+            if not issubclass(type(returned), return_type):
+                raise ValueError(f"Function must return a {return_type} or a subclass")
+
+            
         if not is_serializable(returned):
             raise ValueError("Function must return a serializable object")
+
+        if isinstance(returned, BaseModel):
+            returned = returned.model_dump_json()
 
         if returned:
             await self.publish(
