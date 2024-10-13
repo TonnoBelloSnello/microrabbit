@@ -1,7 +1,7 @@
 import importlib.util
 import json
 from pathlib import Path
-
+from pydantic import BaseModel
 
 class PluginLoader:
     def __init__(self, plugins_dir: Path):
@@ -16,6 +16,9 @@ class PluginLoader:
 
 
 def is_serializable(obj):
+    if isinstance(obj, BaseModel):
+        return True
+    
     try:
         json.dumps(obj)
         return True

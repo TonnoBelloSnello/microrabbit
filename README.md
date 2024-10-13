@@ -118,7 +118,8 @@ async def handler(data: dict):
 ```
 
 ### Message Data Types
-In the handler function, you can specify the data type of the message using type annotations:
+In the handler function, you can specify the data type of the message using type annotations for parameters and return values. 
+#### if the types are not valid a `ValueError` will be raised:
 
 ```python
 from microrabbit import Client
@@ -130,10 +131,9 @@ class Message(BaseModel):
     test: str
     
 @Client.on_message("queue_name")
-async def handler(data: Union[Message, int]):
-    # if the message is not a valid Message object or an int, an error will be raised
+async def handler(data: Union[Message, int]) -> Union[Message, int]:
     print(data.test) 
-    return response_data
+    return data # Could be a Message object or an int, you can return any serializable object or any BaseModel object
 
 ```
 
