@@ -170,8 +170,12 @@ class Client(AbstractClient):
         returned = await function(data)
 
         if function.__annotations__.get("return") is not None:
-            if not issubclass(type(returned), function.__annotations__["return"]):
-                raise ValueError(f"Function must return a {function.__annotations__['return']} or a subclass")
+            return_type = function.__annotations__["return"]
+            if hasattr(return_type, '__args__'):
+                return_type = return_type.__args__
+            
+            if not issubclass(type(returned), return_type):
+                raise ValueError(f"Function must return a {return_type} or a subclass")
 
             
         if not is_serializable(returned):
