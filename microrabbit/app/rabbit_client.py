@@ -1,14 +1,18 @@
-import ast
+import json
 import asyncio
 import inspect
 import sys
+import ast
+
 from functools import partial
 from typing import Callable, Awaitable, Union, Literal, List, get_origin, get_args, Dict, Any, Type
 
 if sys.version_info >= (3, 10):
     from types import UnionType
 
-from aio_pika import IncomingMessage, Exchange
+from aio_pika import IncomingMessage
+from aio_pika.abc import AbstractExchange
+
 from pydantic import ValidationError, BaseModel
 
 from microrabbit.abc import AbstractClient, _queues, _logger
@@ -46,7 +50,7 @@ def _params_dict(function: Callable[..., Awaitable]) -> Dict[str, List[Type]]:
     return params_dict
 
 
-def _parse_data(data: Dict[str, Any], params: Dict[str, List[Type]]) -> Any:
+def _parse_data(data: Any, params: Dict[str, List[Type]]) -> Any:
     """
     Parse the data from the incoming message.
     :param data: The data from the incoming message
@@ -81,8 +85,8 @@ class Client(AbstractClient):
     def __init__(
             self,
             host: str,
-            instance_id: str = None,
-            plugins: str = None,
+            instance_id: str|None = None,
+            plugins: str|None = None,
             connection_type: Union[CONNECTION_TYPE, Literal["NORMAL", "ROBUST"]] = CONNECTION_TYPE.NORMAL,
             connection_options: ConnectionOptions = ConnectionOptions()
     ):
@@ -107,11 +111,22 @@ class Client(AbstractClient):
             _logger.warning("You are trying to connect to RabbitMQ while already connected")
 
         self._connection = await self._connect()
+        if not self._connection:
+            raise ConnectionError("Failed to connect to RabbitMQ")
+        
         self._channel = await self._connection.channel()
+
+        if not self._channel:
+            raise ConnectionError("Failed to connect to RabbitMQ")
+        
         self._exchange = self._channel.default_exchange
         return self._connection, self._channel
 
     async def close(self):
+        if not self._connection:
+            _logger.warning("You are trying to close a connection that is already closed")
+            return
+        
         await self._connection.close()
 
     async def __aenter__(self):
@@ -138,7 +153,7 @@ class Client(AbstractClient):
         await asyncio.Future()
         await asyncio.gather(*global_tasks, *instance_tasks)
 
-    async def _handler(self, exchange: Exchange, function: Callable[..., Awaitable],
+    async def _handler(self, exchange: AbstractExchange, function: Callable[..., Awaitable],
                        no_ack: bool, message: IncomingMessage) -> None:
         """
         Handle the incoming message, decode the body, and call the function with the data.
@@ -154,7 +169,10 @@ class Client(AbstractClient):
         try:
             data = ast.literal_eval(body)
         except (SyntaxError, ValueError):
-            data = body
+            try:
+                data = json.loads(body)
+            except (SyntaxError, ValueError):
+                data = body
 
         params = _params_dict(function)
         if not len(params.keys()):
@@ -185,6 +203,9 @@ class Client(AbstractClient):
             returned = returned.model_dump_json()
 
         if returned:
+            if not message.reply_to:
+                raise ValueError("Message must have a reply_to field to return a response")
+            
             await self.publish(
                 exchange=exchange,
                 routing_key=message.reply_to,
@@ -192,14 +213,18 @@ class Client(AbstractClient):
                 body=returned
             )
 
-    async def _create_queues(self, instance_id: str = None, remove: bool = False) -> List[asyncio.Task]:
+    async def _create_queues(self, instance_id: str|None = None, remove: bool = False) -> List[asyncio.Task]:
         """
         Create the queues from the queues dictionary.
         :param instance_id: The instance ID to use
         :param remove: Whether to remove the queues after consuming them
         """
+        if not self._exchange:
+            raise ValueError("Exchange not declared. Make sure that you are connected to RabbitMQ")
+        
         tasks = []
-        queues = _queues.get(instance_id, {})
+        queues = _queues.get(instance_id, {}) if instance_id else {}
+
         for queue_name, func in queues.copy().items():
             queue = await self.declare_queue(queue_name, func[1])
             tasks.append(
@@ -209,13 +234,17 @@ class Client(AbstractClient):
                         self._exchange,
                         func[0],
                         func[2].no_ack
-                    ),
+                    ), # type: ignore
+
                     **func[2].to_dict()
                 ))
             )
             _logger.debug(f"Consuming function {func[0].__name__} from {queue_name}")
 
             if remove:
-                del _queues[instance_id][queue_name]
+                if not instance_id:
+                    del _queues["global"][queue_name]
+                else:
+                    del _queues[instance_id][queue_name]
 
         return tasks

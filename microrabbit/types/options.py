@@ -16,7 +16,7 @@ class QueueOptions:
     durable: bool = False
     auto_delete: bool = False
     exclusive: bool = False
-    arguments: Dict[str, Union[bool, bytes, bytearray, Decimal, List, float, int, None, str, datetime]] = None
+    arguments: Dict[str, Union[bool, bytes, bytearray, Decimal, List, float, int, None, str, datetime]]|None = None
     timeout: Union[int, float, None] = None
     passive: bool = False
 
@@ -31,8 +31,8 @@ class ConsumerOptions:
     """
     no_ack: bool = False
     exclusive: bool = False
-    arguments: Dict[str, Union[bool, bytes, bytearray, Decimal, List, float, int, None, str, datetime]] = None
-    consumer_tag: str = None
+    arguments: Dict[str, Union[bool, bytes, bytearray, Decimal, List, float, int, None, str, datetime]]|None = None
+    consumer_tag: str|None = None
     timeout: Union[int, float, None] = None
 
     def to_dict(self) -> dict:
@@ -45,11 +45,11 @@ class ConnectionOptions:
     Connection options for the RabbitMQ connection
     """
     ssl: bool = False
-    loop: asyncio.AbstractEventLoop = None
-    ssl_options: SSLOptions = None
-    ssl_context: SSLContext = None
+    loop: asyncio.AbstractEventLoop|None = None
+    ssl_options: SSLOptions|None = None
+    ssl_context: SSLContext|None = None
     timeout: TimeoutType = None
-    client_properties: Dict[str, Union[bool, bytes, bytearray, Decimal, List, float, int, None, str, datetime]] = None
+    client_properties: Dict[str, Union[bool, bytes, bytearray, Decimal, List, float, int, None, str, datetime]]|None = None
 
     def to_dict(self) -> dict:
         return {
