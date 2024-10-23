@@ -5,7 +5,7 @@ import sys
 import ast
 
 from functools import partial
-from typing import Callable, Awaitable, Union, Literal, List, get_origin, get_args, Dict, Any, Type
+from typing import Callable, Awaitable, Optional, Union, Literal, List, get_origin, get_args, Dict, Any, Type
 
 if sys.version_info >= (3, 10):
     from types import UnionType
@@ -85,8 +85,8 @@ class Client(AbstractClient):
     def __init__(
             self,
             host: str,
-            instance_id: str|None = None,
-            plugins: str|None = None,
+            instance_id: Optional[str] = None,
+            plugins: Optional[str] = None,
             connection_type: Union[CONNECTION_TYPE, Literal["NORMAL", "ROBUST"]] = CONNECTION_TYPE.NORMAL,
             connection_options: ConnectionOptions = ConnectionOptions()
     ):
@@ -213,7 +213,7 @@ class Client(AbstractClient):
                 body=returned
             )
 
-    async def _create_queues(self, instance_id: str|None = None, remove: bool = False) -> List[asyncio.Task]:
+    async def _create_queues(self, instance_id: Optional[str] = None, remove: bool = False) -> List[asyncio.Task]:
         """
         Create the queues from the queues dictionary.
         :param instance_id: The instance ID to use

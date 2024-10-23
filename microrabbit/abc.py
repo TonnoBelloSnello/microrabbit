@@ -3,7 +3,7 @@ import uuid
 from abc import ABC, abstractmethod
 from functools import partial
 from pathlib import Path
-from typing import Awaitable, Callable, MutableMapping, Any, Dict, Tuple, Union
+from typing import Awaitable, Callable, MutableMapping, Any, Dict, Optional, Tuple, Union
 
 import aio_pika
 from aio_pika import Connection, Exchange, IncomingMessage, RobustConnection
@@ -22,8 +22,8 @@ class AbstractClient(ABC):
     def __init__(
             self,
             host: str,
-            instance_id: str|None = None,
-            plugins: str|None = None,
+            instance_id: Optional[str] = None,
+            plugins: Optional[str] = None,
             connection_type: CONNECTION_TYPE = CONNECTION_TYPE.NORMAL,
             connection_options: ConnectionOptions = ConnectionOptions()
     ):
@@ -39,10 +39,10 @@ class AbstractClient(ABC):
         self.connection_options = connection_options
         self.instance_id = str(uuid.uuid4()) if not instance_id else instance_id
 
-        self._exchange: AbstractExchange|None = None
-        self._channel: AbstractChannel|AbstractRobustChannel|None = None
-        self._connection: Union[Connection, RobustConnection]|None = None
-        self._on_ready_func: Callable[..., Awaitable]|None = None
+        self._exchange: Optional[AbstractExchange] = None
+        self._channel: Optional[Union[AbstractChannel, AbstractRobustChannel]] = None
+        self._connection: Optional[Union[Connection, RobustConnection]] = None
+        self._on_ready_func: Optional[Callable[..., Awaitable]] = None
         self._futures: MutableMapping[str, asyncio.Future] = {}
         self._callbacks: MutableMapping[str, AbstractQueue] = {}
 
@@ -120,7 +120,7 @@ class AbstractClient(ABC):
             task.cancel()
             await self._channel.queue_delete(new_queue.name)
 
-    async def declare_queue(self, queue_name: str|None = None, options: QueueOptions = QueueOptions()):
+    async def declare_queue(self, queue_name: Optional[str] = None, options: QueueOptions = QueueOptions()):
         if not self._channel:
             raise RuntimeError("Client not connected to RabbitMQ, call connect() or run() first")
         
@@ -129,7 +129,7 @@ class AbstractClient(ABC):
     @staticmethod
     def on_message(
             queue_name: str,
-            instance_id: str|None = None,
+            instance_id: Optional[str] = None,
             queue_options: QueueOptions = QueueOptions(),
             consume_options: ConsumerOptions = ConsumerOptions(),
     ):

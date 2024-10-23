@@ -1,5 +1,6 @@
 import importlib.util
 import json
+from typing import Any
 from pathlib import Path
 from pydantic import BaseModel
 
@@ -11,11 +12,14 @@ class PluginLoader:
         for file in self.plugins_dir.iterdir():
             if file.suffix == ".py":
                 spec = importlib.util.spec_from_file_location(file.stem, file)
+                if not spec or not spec.loader:
+                    continue
+                
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
 
 
-def is_serializable(obj):
+def is_serializable(obj: Any):
     if isinstance(obj, BaseModel):
         return True
     
