@@ -1,6 +1,6 @@
 [project]
 name = "microrabbit"
-version = "0.5.1"
+version = "0.5.2"
 description = "A simple RabbitMQ client for Python"
 readme = "README.md"
 license = {file = "LICENSE.txt"}

@@ -34,7 +34,7 @@ async def test_model(client: Client):
 
     
 @pytest.mark.asyncio
-async def test_model_return(client: Client):
+async def test_model_return_valid(client: Client):
 
     class TestCreateQueue(BaseModel):
         name: str

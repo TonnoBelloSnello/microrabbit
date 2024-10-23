@@ -3,7 +3,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
 from ssl import SSLContext
-from typing import Union, Dict, List
+from typing import Optional, Union, Dict, List
 
 from aio_pika.abc import SSLOptions, TimeoutType
 
@@ -16,7 +16,7 @@ class QueueOptions:
     durable: bool = False
     auto_delete: bool = False
     exclusive: bool = False
-    arguments: Dict[str, Union[bool, bytes, bytearray, Decimal, List, float, int, None, str, datetime]] = None
+    arguments: Optional[Dict[str, Union[bool, bytes, bytearray, Decimal, List, float, int, None, str, datetime]]] = None
     timeout: Union[int, float, None] = None
     passive: bool = False
 
@@ -31,8 +31,8 @@ class ConsumerOptions:
     """
     no_ack: bool = False
     exclusive: bool = False
-    arguments: Dict[str, Union[bool, bytes, bytearray, Decimal, List, float, int, None, str, datetime]] = None
-    consumer_tag: str = None
+    arguments: Optional[Dict[str, Union[bool, bytes, bytearray, Decimal, List, float, int, None, str, datetime]]] = None
+    consumer_tag: Optional[str] = None
     timeout: Union[int, float, None] = None
 
     def to_dict(self) -> dict:
@@ -45,11 +45,11 @@ class ConnectionOptions:
     Connection options for the RabbitMQ connection
     """
     ssl: bool = False
-    loop: asyncio.AbstractEventLoop = None
-    ssl_options: SSLOptions = None
-    ssl_context: SSLContext = None
+    loop: Optional[asyncio.AbstractEventLoop] = None
+    ssl_options: Optional[SSLOptions] = None
+    ssl_context: Optional[SSLContext] = None
     timeout: TimeoutType = None
-    client_properties: Dict[str, Union[bool, bytes, bytearray, Decimal, List, float, int, None, str, datetime]] = None
+    client_properties: Optional[Dict[str, Union[bool, bytes, bytearray, Decimal, List, float, int, None, str, datetime]]] = None
 
     def to_dict(self) -> dict:
         return {

@@ -3,10 +3,11 @@ import uuid
 from abc import ABC, abstractmethod
 from functools import partial
 from pathlib import Path
-from typing import Awaitable, Callable, MutableMapping, Any, Dict, Tuple, Union
+from typing import Awaitable, Callable, MutableMapping, Any, Dict, Optional, Tuple, Union
 
 import aio_pika
-from aio_pika import Channel, Connection, Exchange, Queue, IncomingMessage, RobustConnection
+from aio_pika import Connection, Exchange, IncomingMessage, RobustConnection
+from aio_pika.abc import AbstractQueue, AbstractRobustChannel, AbstractChannel, AbstractExchange
 
 from .app.utils import PluginLoader, is_serializable
 from .logger import get_logger
@@ -21,8 +22,8 @@ class AbstractClient(ABC):
     def __init__(
             self,
             host: str,
-            instance_id: str = None,
-            plugins: str = None,
+            instance_id: Optional[str] = None,
+            plugins: Optional[str] = None,
             connection_type: CONNECTION_TYPE = CONNECTION_TYPE.NORMAL,
             connection_options: ConnectionOptions = ConnectionOptions()
     ):
@@ -38,12 +39,12 @@ class AbstractClient(ABC):
         self.connection_options = connection_options
         self.instance_id = str(uuid.uuid4()) if not instance_id else instance_id
 
-        self._exchange = None
-        self._channel: Channel = None
-        self._connection: Union[Connection, RobustConnection] = None
-        self._on_ready_func: Callable[..., Awaitable] = None
+        self._exchange: Optional[AbstractExchange] = None
+        self._channel: Optional[Union[AbstractChannel, AbstractRobustChannel]] = None
+        self._connection: Optional[Union[Connection, RobustConnection]] = None
+        self._on_ready_func: Optional[Callable[..., Awaitable]] = None
         self._futures: MutableMapping[str, asyncio.Future] = {}
-        self._callbacks: MutableMapping[str, Queue] = {}
+        self._callbacks: MutableMapping[str, AbstractQueue] = {}
 
         if plugins and plugins == ".":
             raise ValueError("Plugins directory cannot be the current directory")
@@ -84,10 +85,13 @@ class AbstractClient(ABC):
         """
         Check if the client is connected to RabbitMQ.
         """
-        if self._connection is None or self._connection.is_closed:
+        if self._connection is None or self._connection.is_closed or not self._exchange or not self._channel:
             return False
 
         async def message_handler(exchange: Exchange, message: IncomingMessage):
+            if not message.reply_to or not message.correlation_id:
+                raise ValueError("Bad message")
+            
             await self.publish(
                 exchange=exchange,
                 routing_key=message.reply_to,
@@ -99,7 +103,7 @@ class AbstractClient(ABC):
         new_queue = await self.declare_queue(options=QueueOptions(exclusive=True, auto_delete=True))
         task = asyncio.create_task(
             new_queue.consume(
-                partial(message_handler, self._exchange),
+                partial(message_handler, self._exchange), # type: ignore
                 no_ack=True,
                 exclusive=True,
                 timeout=1
@@ -116,13 +120,16 @@ class AbstractClient(ABC):
             task.cancel()
             await self._channel.queue_delete(new_queue.name)
 
-    async def declare_queue(self, queue_name: str = None, options: QueueOptions = QueueOptions()):
+    async def declare_queue(self, queue_name: Optional[str] = None, options: QueueOptions = QueueOptions()):
+        if not self._channel:
+            raise RuntimeError("Client not connected to RabbitMQ, call connect() or run() first")
+        
         return await self._channel.declare_queue(name=queue_name, **options.to_dict())
 
     @staticmethod
     def on_message(
             queue_name: str,
-            instance_id: str = None,
+            instance_id: Optional[str] = None,
             queue_options: QueueOptions = QueueOptions(),
             consume_options: ConsumerOptions = ConsumerOptions(),
     ):
@@ -143,7 +150,7 @@ class AbstractClient(ABC):
         def decorator(func: Callable[..., Awaitable[Any]]) :
             if queue_name in _queues["global"]:
                 raise ValueError(f"Function {queue_name} already added to function {_queues['global'][queue_name][0].__name__}")
-            if queue_name in _queues.get(instance_id, {}):
+            if instance_id and queue_name in _queues.get(instance_id, {}):
                 raise ValueError(f"Function {queue_name} already added to function {_queues[instance_id][queue_name][0].__name__}")
 
             if not instance_id:
@@ -192,8 +199,8 @@ class AbstractClient(ABC):
         :return:
         """
 
-        if self._connection is None:
-            raise RuntimeError("Client not connected to RabbitMQ, call connect() first")
+        if self._connection is None or not self._channel or not self._exchange:
+            raise RuntimeError("Client not connected to RabbitMQ, call connect() or run() first")
 
         if correlation_id is None:
             correlation_id = str(uuid.uuid4())
@@ -214,7 +221,7 @@ class AbstractClient(ABC):
         self._futures[correlation_id] = future
         self._callbacks[correlation_id] = await self._channel.declare_queue(exclusive=True, auto_delete=True)
 
-        await self._callbacks[correlation_id].consume(self._on_response, no_ack=True, exclusive=True, timeout=timeout)
+        await self._callbacks[correlation_id].consume(self._on_response, no_ack=True, exclusive=True, timeout=timeout) # type: ignore
 
         await self._exchange.publish(
             message=aio_pika.Message(
@@ -239,7 +246,7 @@ class AbstractClient(ABC):
             del self._callbacks[correlation_id]
 
     @staticmethod
-    async def publish(exchange: Exchange, routing_key: str, correlation_id, body: Dict):
+    async def publish(exchange: AbstractExchange, routing_key: str, correlation_id, body: Any):
         """
         Publish a message to an exchange with a routing key and correlation id.
         :param exchange: the exchange to publish the message to
